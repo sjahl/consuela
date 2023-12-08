@@ -13,6 +13,7 @@ struct DatedFile {
 }
 
 // Build a list of DatedFiles in the given filepath
+// BUG: Folders that have already been organized by date will be moved if the Date is not the same as the ctime... duh.
 fn dir_listing(fp: &str) -> io::Result<Vec<DatedFile>> {
     let mut file_list: Vec<DatedFile> = Vec::new();
     for entry in read_dir(fp)? {
@@ -20,14 +21,12 @@ fn dir_listing(fp: &str) -> io::Result<Vec<DatedFile>> {
             Ok(entry) => {
                 let name = entry.path();
                 let time = entry.metadata()?.created()?;
-                let dtime = derive_date(time)?;
+                let dtime = derive_date(time);
                 if !name.ends_with(&dtime) {
                     file_list.push(DatedFile {
                         path: name.display().to_string(),
                         ctime: dtime,
                     })
-                } else {
-                    continue;
                 }
             }
             Err(err) => eprintln!("i don't understand wtf is going on: {}", err),
@@ -37,15 +36,27 @@ fn dir_listing(fp: &str) -> io::Result<Vec<DatedFile>> {
 }
 
 // Derive the YYYY-MM creation date of the file
-fn derive_date(st_ctime: SystemTime) -> io::Result<String> {
+fn derive_date(st_ctime: SystemTime) -> String {
     let datetime: DateTime<Utc> = st_ctime.into();
-    Ok(datetime.format("%Y-%m").to_string())
+    datetime.format("%Y-%m").to_string()
+}
+
+fn move_file_to_directory(source: &Path, target_dir: &Path) -> Result<(), io::Error> {
+    // Generate the target filename
+    let target_filename = source.file_name().ok_or(io::Error::new(
+        io::ErrorKind::InvalidInput,
+        "Source path must have a filename",
+    ))?;
+    let target_path = target_dir.join(target_filename);
+
+    // Move the file
+    rename(source, target_path)
 }
 
 fn main() {
     // TODO: parse stdin for a filename
 
-    let root_folder = Path::new("/tmp/test-consuela"); // TODO: make this a cli arg
+    let root_folder = Path::new("/Users/sjahl/Downloads"); // TODO: make this a cli arg
     let files_list = match dir_listing(&root_folder.display().to_string()) {
         Ok(v) => v,
         Err(err) => panic!("error: {}", err),
@@ -64,9 +75,11 @@ fn main() {
         let _ = create_dir(&full_fp);
         println!("will move {v:?} into {k:?}");
         for filename in v {
-            let fuck = Path::new(filename).file_name().unwrap();
-            let target = &full_fp.join(fuck);
-            let _ = rename(filename, target);
+            let source = Path::new(filename);
+            match move_file_to_directory(source, &full_fp) {
+                Ok(_) => println!("File moved successfully"),
+                Err(error) => println!("Error moving file: {}", error),
+            }
         }
     }
 
