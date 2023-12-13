@@ -1,11 +1,12 @@
 use chrono::offset::Utc;
 use chrono::DateTime;
+use regex::Regex;
 use std::collections::HashMap;
+use std::env;
 use std::fs::{create_dir, read_dir, rename};
 use std::io;
 use std::path::Path;
 use std::time::SystemTime;
-use regex::Regex;
 
 // Represents a file and creation date
 struct DatedFile {
@@ -14,7 +15,6 @@ struct DatedFile {
 }
 
 // Build a list of DatedFiles in the given filepath
-// BUG: Folders that have already been organized by date will be moved if the Date is not the same as the ctime... duh.
 fn dir_listing(fp: &str) -> io::Result<Vec<DatedFile>> {
     let mut file_list: Vec<DatedFile> = Vec::new();
     for entry in read_dir(fp)? {
@@ -23,7 +23,7 @@ fn dir_listing(fp: &str) -> io::Result<Vec<DatedFile>> {
                 let name = entry.path();
                 let time = entry.metadata()?.created()?;
                 let dtime = derive_date(time);
-                let my_folders = Regex::new(r"^\d{4}-\d{2}$").unwrap();
+                let my_folders = Regex::new(r"^\d{4}-\d{2}$|^\.DS_Store$").unwrap();
                 if !my_folders.is_match(name.file_name().unwrap().to_str().unwrap()) {
                     file_list.push(DatedFile {
                         path: name.display().to_string(),
@@ -58,7 +58,8 @@ fn move_file_to_directory(source: &Path, target_dir: &Path) -> Result<(), io::Er
 fn main() {
     // TODO: parse stdin for a filename
 
-    let root_folder = Path::new("/home/stj/Downloads"); // TODO: make this a cli arg
+    let args: Vec<String> = env::args().collect();
+    let root_folder = Path::new(&args[1]);
     let files_list = match dir_listing(&root_folder.display().to_string()) {
         Ok(v) => v,
         Err(err) => panic!("error: {}", err),
