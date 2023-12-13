@@ -5,6 +5,7 @@ use std::fs::{create_dir, read_dir, rename};
 use std::io;
 use std::path::Path;
 use std::time::SystemTime;
+use regex::Regex;
 
 // Represents a file and creation date
 struct DatedFile {
@@ -22,7 +23,8 @@ fn dir_listing(fp: &str) -> io::Result<Vec<DatedFile>> {
                 let name = entry.path();
                 let time = entry.metadata()?.created()?;
                 let dtime = derive_date(time);
-                if !name.ends_with(&dtime) {
+                let my_folders = Regex::new(r"^\d{4}-\d{2}$").unwrap();
+                if !my_folders.is_match(name.file_name().unwrap().to_str().unwrap()) {
                     file_list.push(DatedFile {
                         path: name.display().to_string(),
                         ctime: dtime,
@@ -56,7 +58,7 @@ fn move_file_to_directory(source: &Path, target_dir: &Path) -> Result<(), io::Er
 fn main() {
     // TODO: parse stdin for a filename
 
-    let root_folder = Path::new("/Users/sjahl/Downloads"); // TODO: make this a cli arg
+    let root_folder = Path::new("/home/stj/Downloads"); // TODO: make this a cli arg
     let files_list = match dir_listing(&root_folder.display().to_string()) {
         Ok(v) => v,
         Err(err) => panic!("error: {}", err),
