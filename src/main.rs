@@ -17,21 +17,21 @@ struct DatedFile {
 // Build a list of DatedFiles in the given filepath
 fn dir_listing(fp: &str) -> io::Result<Vec<DatedFile>> {
     let mut file_list: Vec<DatedFile> = Vec::new();
+    let my_folders = Regex::new(r"^\d{4}-\d{2}$|^\.DS_Store$").unwrap();
     for entry in read_dir(fp)? {
         match entry {
             Ok(entry) => {
                 let name = entry.path();
                 let time = entry.metadata()?.created()?;
                 let dtime = derive_date(time);
-                let my_folders = Regex::new(r"^\d{4}-\d{2}$|^\.DS_Store$").unwrap();
                 if !my_folders.is_match(name.file_name().unwrap().to_str().unwrap()) {
                     file_list.push(DatedFile {
                         path: name.display().to_string(),
                         ctime: dtime,
-                    })
+                    });
                 }
             }
-            Err(err) => eprintln!("i don't understand wtf is going on: {}", err),
+            Err(err) => eprintln!("i don't understand wtf is going on: {err}"),
         }
     }
     Ok(file_list)
@@ -62,7 +62,7 @@ fn main() {
     let root_folder = Path::new(&args[1]);
     let files_list = match dir_listing(&root_folder.display().to_string()) {
         Ok(v) => v,
-        Err(err) => panic!("error: {}", err),
+        Err(err) => panic!("error: {err}"),
     };
 
     let mut date_groups = HashMap::new();
@@ -70,7 +70,7 @@ fn main() {
         date_groups
             .entry(item.ctime)
             .or_insert_with(Vec::new)
-            .push(item.path)
+            .push(item.path);
     }
 
     for (k, v) in &date_groups {
@@ -80,8 +80,8 @@ fn main() {
         for filename in v {
             let source = Path::new(filename);
             match move_file_to_directory(source, &full_fp) {
-                Ok(_) => println!("File moved successfully"),
-                Err(error) => println!("Error moving file: {}", error),
+                Ok(()) => println!("File moved successfully"),
+                Err(error) => println!("Error moving file: {error}"),
             }
         }
     }
